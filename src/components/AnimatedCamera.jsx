@@ -16,6 +16,9 @@ function AnimatedCamera({
   const cameraRef = useRef()
   const { set } = useThree()
 
+  // 用于存储Phase 3开始时的相机状态，确保平滑过渡
+  const phase3StartState = useRef(null)
+
   // 三阶段动画配置
   const PHASE_CONFIG = {
     WAIT_DURATION: 2.0,      // Phase 0: 等待阶段 2秒
@@ -40,6 +43,9 @@ function AnimatedCamera({
 
   // 计算当前动画阶段
   const getCurrentPhase = (time) => {
+    const originalAnimationDuration = animationExtractor?.getOriginalAnimationDuration() || 7
+    const phase2EndTime = PHASE_CONFIG.WAIT_DURATION + PHASE_CONFIG.TRANSITION_DURATION + originalAnimationDuration
+
     if (time < PHASE_CONFIG.WAIT_DURATION) {
       return { phase: 0, phaseTime: time }
     } else if (time < PHASE_CONFIG.WAIT_DURATION + PHASE_CONFIG.TRANSITION_DURATION) {
@@ -47,10 +53,15 @@ function AnimatedCamera({
         phase: 1,
         phaseTime: time - PHASE_CONFIG.WAIT_DURATION
       }
-    } else {
+    } else if (time < phase2EndTime) {
       return {
         phase: 2,
         phaseTime: time - PHASE_CONFIG.WAIT_DURATION - PHASE_CONFIG.TRANSITION_DURATION
+      }
+    } else {
+      return {
+        phase: 3,
+        phaseTime: time - phase2EndTime
       }
     }
   }
@@ -79,6 +90,11 @@ function AnimatedCamera({
 
     try {
       const { phase, phaseTime } = getCurrentPhase(currentTime)
+
+      // 重置Phase 3状态（当不在Phase 3时）
+      if (phase !== 3 && phase3StartState.current) {
+        phase3StartState.current = null
+      }
 
       if (phase === 0) {
         // Phase 0: 等待阶段 - 静态相机位置
@@ -154,16 +170,18 @@ function AnimatedCamera({
           cameraRef.current.updateProjectionMatrix()
         }
 
-      } else {
+      } else if (phase === 2) {
         // Phase 2: 动画阶段 - 播放原有动画
         if (!animationExtractor?.isReady()) return
 
         // 从动画提取器获取相机变换数据
+        console.log(`🎬 Getting camera transform for time: ${phaseTime.toFixed(2)}s`)
         const cameraTransform = animationExtractor.getCameraTransformAtTime(phaseTime)
+        console.log(`📊 animationExtractor ready: ${animationExtractor?.isReady()}, duration: ${animationExtractor?.getDuration()}`)
 
-        // 计算结尾调整（最后1.5秒开始调整视角让圆环居中）
+        // 计算结尾调整（最后3秒开始轻微调整，为 Phase 3 做准备）
         const originalDuration = animationExtractor.getDuration()
-        const adjustDuration = 1.5 // 延长过渡时间
+        const adjustDuration = 3.0 // 减少到3秒，让调整更轻微
         const endAdjustStartTime = originalDuration - adjustDuration
         const isInEndAdjustment = phaseTime >= endAdjustStartTime
 
@@ -174,7 +192,16 @@ function AnimatedCamera({
 
         const smoothFactor = easeInOutCubic(adjustFactor)
 
+        // 调试信息 - 检查调整是否被触发
+        if (phaseTime > 5) { // 只在动画后期显示
+          console.log(`🎯 Time: ${phaseTime.toFixed(2)}s, Duration: ${originalDuration.toFixed(2)}s, EndStart: ${endAdjustStartTime.toFixed(2)}s`)
+          console.log(`🎯 IsInEndAdjustment: ${isInEndAdjustment}, AdjustFactor: ${adjustFactor.toFixed(3)}`)
+        }
+
+        // 调试cameraTransform
+        console.log(`🔍 cameraTransform exists: ${!!cameraTransform}, phaseTime: ${phaseTime.toFixed(2)}s`)
         if (cameraTransform) {
+          console.log(`✅ cameraTransform found, proceeding with camera updates`)
           // 更新相机位置
           if (cameraTransform.position) {
             let x = cameraTransform.position.x
@@ -187,9 +214,15 @@ function AnimatedCamera({
               const positionFactor = Math.min(1, adjustFactor / 0.7)
               const positionSmooth = easeInOutCubic(positionFactor)
 
-              x += 1.5 * positionSmooth  // 稍微减小调整幅度，更自然
-              y += -0.7 * positionSmooth // 稍微减小调整幅度
+              const deltaX = 4.0 * positionSmooth  // 减少向左移动，让过渡更平滑
+              const deltaY = -0.15 * positionSmooth // 减小向下移动
 
+              x += deltaX
+              y += deltaY
+
+              console.log(`🎯 END ADJUSTMENT ACTIVE! Time: ${phaseTime.toFixed(2)}s`)
+              console.log(`📍 Position adjustment: deltaX=${deltaX.toFixed(3)}, deltaY=${deltaY.toFixed(3)}`)
+              console.log(`📍 Final position: [${x.toFixed(2)}, ${y.toFixed(2)}, ${z.toFixed(2)}]`)
             }
 
             cameraRef.current.position.set(x, y, z)
@@ -214,7 +247,7 @@ function AnimatedCamera({
 
                 // 创建向左看的额外旋转，减小幅度更自然
                 const adjustRotation = new THREE.Quaternion()
-                adjustRotation.setFromEuler(new THREE.Euler(0, -0.15 * rotationSmooth, 0)) // 减小角度调整
+                adjustRotation.setFromEuler(new THREE.Euler(0, -0.05 * rotationSmooth, 0)) // 更轻微的角度调整
 
                 // 应用额外旋转
                 quat.multiply(adjustRotation)
@@ -233,7 +266,7 @@ function AnimatedCamera({
                 const rotationFactor = adjustFactor > 0.3 ? (adjustFactor - 0.3) / 0.7 : 0
                 const rotationSmooth = easeInOutCubic(rotationFactor)
 
-                rotY += -0.15 * rotationSmooth // 减小角度调整，向左转
+                rotY += 0 * rotationSmooth // 更轻微的角度调整
               }
 
               cameraRef.current.rotation.set(rotX, rotY, rotZ)
@@ -244,6 +277,94 @@ function AnimatedCamera({
           if (cameraTransform.fov !== undefined) {
             cameraRef.current.fov = cameraTransform.fov
             cameraRef.current.updateProjectionMatrix()
+          }
+        }
+
+      } else if (phase === 3) {
+        // Phase 3: 结尾优化阶段 - 优雅的相机漂移调整
+        console.log(`✨ Phase 3 - Elegant camera drift! Time: ${phaseTime.toFixed(2)}s`)
+
+        // 在Phase 3刚开始时，记录当前相机状态作为起始点
+        if (phaseTime < 0.05 && !phase3StartState.current) {
+          phase3StartState.current = {
+            position: {
+              x: cameraRef.current.position.x,
+              y: cameraRef.current.position.y,
+              z: cameraRef.current.position.z
+            },
+            rotation: {
+              x: cameraRef.current.rotation.x,
+              y: cameraRef.current.rotation.y,
+              z: cameraRef.current.rotation.z
+            },
+            fov: cameraRef.current.fov
+          }
+          console.log(`🎯 Phase 3 baseline recorded`)
+        }
+
+        if (phase3StartState.current) {
+          // 使用更长的调整时间和更优雅的缓动
+          const adjustDuration = 4.0 // 延长调整时间到4秒，给足时间精确对位
+          const adjustProgress = Math.min(1, phaseTime / adjustDuration)
+          
+          // 使用更优雅的缓动函数 - quintic easing
+          const easeOutQuint = (t) => {
+            return 1 - Math.pow(1 - t, 5)
+          }
+          const smoothProgress = easeOutQuint(adjustProgress)
+
+          const startPos = phase3StartState.current.position
+          const startRot = phase3StartState.current.rotation
+          const startFov = phase3StartState.current.fov
+
+          // 优化目标调整 - 正对圆环中心
+          const targetXOffset = 2.5   // 向右移动，居中对准圆环
+          const targetYOffset = -1.0  // 向下移动，垂直居中
+          const targetZOffset = 5.0   // 向后移动到最佳观看距离
+
+          // 使用分段调整，让移动更有层次
+          let positionProgress = smoothProgress
+          let rotationProgress = Math.max(0, smoothProgress - 0.2) / 0.8 // 旋转稍微延迟
+          rotationProgress = Math.min(1, rotationProgress)
+
+          // 平滑位置调整
+          const currentX = startPos.x + targetXOffset * positionProgress
+          const currentY = startPos.y + targetYOffset * positionProgress
+          const currentZ = startPos.z + targetZOffset * positionProgress
+
+          cameraRef.current.position.set(currentX, currentY, currentZ)
+
+          // 精确旋转调整 - 使用lookAt方法确保正对圆环
+          const ringCenterPosition = [0, 8, 0] // 假设的圆环中心位置
+          
+          if (rotationProgress > 0) {
+            // 创建一个临时相机来计算lookAt旋转
+            const tempCamera = new THREE.PerspectiveCamera()
+            tempCamera.position.set(currentX, currentY, currentZ)
+            tempCamera.lookAt(ringCenterPosition[0], ringCenterPosition[1], ringCenterPosition[2])
+            
+            // 在原始旋转和lookAt旋转之间插值
+            const targetRotation = tempCamera.rotation
+            
+            const currentRotX = startRot.x + (targetRotation.x - startRot.x) * rotationProgress
+            const currentRotY = startRot.y + (targetRotation.y - startRot.y) * rotationProgress
+            const currentRotZ = startRot.z + (targetRotation.z - startRot.z) * rotationProgress
+            
+            cameraRef.current.rotation.set(currentRotX, currentRotY, currentRotZ)
+          } else {
+            cameraRef.current.rotation.set(startRot.x, startRot.y, startRot.z)
+          }
+
+          // FOV调整 - 适合圆环完整显示
+          const targetFovOffset = -3.0  // 稍微缩小FOV，让圆环更突出
+          const currentFov = startFov + targetFovOffset * smoothProgress
+
+          cameraRef.current.fov = currentFov
+          cameraRef.current.updateProjectionMatrix()
+
+          // 简化日志输出
+          if (phaseTime % 0.5 < 0.05) { // 每0.5秒输出一次
+            console.log(`✨ Elegant drift: ${(smoothProgress * 100).toFixed(0)}% complete`)
           }
         }
       }
