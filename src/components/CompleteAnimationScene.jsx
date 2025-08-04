@@ -96,19 +96,28 @@ const CompleteAnimationScene = forwardRef(({
     }
   }))
 
-  // 动画循环
+  // 动画播放（一次性，不循环）
   useFrame((state, deltaTime) => {
     if (!isInitialized || !isPlaying) return
 
     // 更新动画时间
     const newTime = currentTime + deltaTime
     const totalDuration = multiSourceAnimationExtractor.getDuration()
-    
-    // 循环播放
-    const normalizedTime = totalDuration > 0 ? newTime % totalDuration : 0
-    
-    setCurrentTime(normalizedTime)
-    if (onTimeChange) onTimeChange(normalizedTime)
+
+    // 检查是否到达动画结尾
+    if (newTime >= totalDuration) {
+      // 动画结束，停止播放
+      setCurrentTime(totalDuration)
+      setIsPlaying(false)
+      if (onPlayingChange) onPlayingChange(false)
+      if (onTimeChange) onTimeChange(totalDuration)
+      console.log('🏁 Animation completed - stopped at end')
+      return
+    }
+
+    // 正常播放，不循环
+    setCurrentTime(newTime)
+    if (onTimeChange) onTimeChange(newTime)
   })
 
   // 处理相机更新
@@ -161,22 +170,50 @@ function AnimatedRings({ animationExtractor, isPlaying, currentTime, v6Nodes, v6
   const ring2Ref = useRef()
   const ring3Ref = useRef()
 
+  // 三阶段动画配置（与AnimatedCamera保持一致）
+  const PHASE_CONFIG = {
+    WAIT_DURATION: 2.0,      // Phase 0: 等待阶段 2秒
+    TRANSITION_DURATION: 1.0, // Phase 1: 过渡阶段 1秒
+  }
+
+  // 计算当前动画阶段
+  const getCurrentPhase = (time) => {
+    if (time < PHASE_CONFIG.WAIT_DURATION) {
+      return { phase: 0, phaseTime: time }
+    } else if (time < PHASE_CONFIG.WAIT_DURATION + PHASE_CONFIG.TRANSITION_DURATION) {
+      return {
+        phase: 1,
+        phaseTime: time - PHASE_CONFIG.WAIT_DURATION
+      }
+    } else {
+      return {
+        phase: 2,
+        phaseTime: time - PHASE_CONFIG.WAIT_DURATION - PHASE_CONFIG.TRANSITION_DURATION
+      }
+    }
+  }
+
   useFrame(() => {
     if (!animationExtractor?.isReady() || !isPlaying) return
 
     try {
-      // 获取所有环的变换数据
-      const transforms = animationExtractor.getAllTransformsAtTime(currentTime)
-      
+      const { phase, phaseTime } = getCurrentPhase(currentTime)
+
+      // 只在Phase 2（动画阶段）播放环动画
+      if (phase !== 2) return
+
+      // 获取所有环的变换数据（使用phaseTime而不是currentTime）
+      const transforms = animationExtractor.getAllTransformsAtTime(phaseTime)
+
       // 计算动画结尾调整（最后1.5秒开始调整，与相机同步）
-      const totalDuration = animationExtractor.getDuration()
+      const originalDuration = animationExtractor.getDuration() - PHASE_CONFIG.WAIT_DURATION - PHASE_CONFIG.TRANSITION_DURATION
       const adjustDuration = 1.5 // 与相机调整时间同步
-      const endAdjustStartTime = totalDuration - adjustDuration
-      const isInEndAdjustment = currentTime >= endAdjustStartTime
-      
+      const endAdjustStartTime = originalDuration - adjustDuration
+      const isInEndAdjustment = phaseTime >= endAdjustStartTime
+
       // 平滑调整因子 (0 到 1)
-      const adjustFactor = isInEndAdjustment 
-        ? Math.min(1, (currentTime - endAdjustStartTime) / adjustDuration)
+      const adjustFactor = isInEndAdjustment
+        ? Math.min(1, (phaseTime - endAdjustStartTime) / adjustDuration)
         : 0
       
       // 使用与相机相同的高级缓动函数

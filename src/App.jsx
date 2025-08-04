@@ -18,6 +18,7 @@ function App() {
     if (sceneRef.current?.playAnimation) {
       sceneRef.current.playAnimation()
       setIsPlaying(true)
+      console.log('🎬 Starting one-time animation playback')
     }
   }
 
@@ -26,6 +27,7 @@ function App() {
       sceneRef.current.stopAnimation()
       setIsPlaying(false)
       setCurrentTime(0)
+      console.log('⏹️ Animation stopped and reset to beginning')
     }
   }
 
@@ -92,6 +94,18 @@ function App() {
           <div style={{ marginTop: '10px', fontSize: '11px' }}>
             <div>📍 Pos: [{cameraState.position?.map(p => p.toFixed(1)).join(', ')}]</div>
             <div>🔍 FOV: {cameraState.fov?.toFixed(1)}°</div>
+            {cameraState.phase !== undefined && (
+              <div style={{
+                color: cameraState.phase === 0 ? '#ff6600' :
+                       cameraState.phase === 1 ? '#ffff00' : '#00ff00',
+                marginTop: '5px'
+              }}>
+                🎬 Phase {cameraState.phase}: {
+                  cameraState.phase === 0 ? 'Waiting' :
+                  cameraState.phase === 1 ? 'Transitioning' : 'Animating'
+                } ({cameraState.phaseTime?.toFixed(2)}s)
+              </div>
+            )}
           </div>
         )}
       </div>

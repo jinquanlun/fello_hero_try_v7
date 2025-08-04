@@ -280,22 +280,31 @@ export class MultiSourceAnimationExtractor {
 
   /**
    * 计算总动画时长
+   * 包含三阶段：等待(2s) + 过渡(1s) + 原动画
    */
   calculateTotalDuration() {
-    let maxDuration = 0
+    let maxOriginalDuration = 0
 
     if (this.animationData.camera) {
-      maxDuration = Math.max(maxDuration, this.animationData.camera.duration)
+      maxOriginalDuration = Math.max(maxOriginalDuration, this.animationData.camera.duration)
     }
 
     Object.values(this.animationData.rings).forEach(ringData => {
       if (ringData) {
-        maxDuration = Math.max(maxDuration, ringData.duration)
+        maxOriginalDuration = Math.max(maxOriginalDuration, ringData.duration)
       }
     })
 
-    this.totalDuration = maxDuration
-    console.log(`⏱️ Total animation duration: ${this.totalDuration.toFixed(2)}s`)
+    // 三阶段总时长 = 等待阶段(2s) + 过渡阶段(1s) + 原动画时长
+    const WAIT_DURATION = 2.0
+    const TRANSITION_DURATION = 1.0
+    this.totalDuration = WAIT_DURATION + TRANSITION_DURATION + maxOriginalDuration
+
+    console.log(`⏱️ Three-Phase Animation Duration:`)
+    console.log(`   Phase 0 (Wait): ${WAIT_DURATION}s`)
+    console.log(`   Phase 1 (Transition): ${TRANSITION_DURATION}s`)
+    console.log(`   Phase 2 (Original Animation): ${maxOriginalDuration.toFixed(2)}s`)
+    console.log(`   Total: ${this.totalDuration.toFixed(2)}s`)
   }
 
   /**

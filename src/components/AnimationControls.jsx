@@ -90,21 +90,69 @@ function AnimationControls({
       {/* 时间显示 */}
       <div style={{ marginBottom: '15px' }}>
         <div>Time: {currentTime.toFixed(2)}s / {totalDuration.toFixed(2)}s</div>
-        <div style={{ 
-          width: '100%', 
-          height: '6px', 
-          background: '#333', 
-          borderRadius: '3px',
+
+        {/* 三阶段进度条 */}
+        <div style={{
+          width: '100%',
+          height: '8px',
+          background: '#333',
+          borderRadius: '4px',
           marginTop: '5px',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          position: 'relative'
         }}>
+          {/* Phase 0: 等待阶段 */}
           <div style={{
-            width: `${progress}%`,
+            position: 'absolute',
+            left: '0%',
+            width: `${totalDuration > 0 ? (2.0 / totalDuration) * 100 : 0}%`,
             height: '100%',
-            background: '#00ff00',
-            transition: 'width 0.1s'
+            background: currentTime < 2.0 ? '#ff6600' : '#444',
+            borderRight: '1px solid #000'
+          }} />
+
+          {/* Phase 1: 过渡阶段 */}
+          <div style={{
+            position: 'absolute',
+            left: `${totalDuration > 0 ? (2.0 / totalDuration) * 100 : 0}%`,
+            width: `${totalDuration > 0 ? (1.0 / totalDuration) * 100 : 0}%`,
+            height: '100%',
+            background: (currentTime >= 2.0 && currentTime < 3.0) ? '#ffff00' : '#444',
+            borderRight: '1px solid #000'
+          }} />
+
+          {/* Phase 2: 动画阶段 */}
+          <div style={{
+            position: 'absolute',
+            left: `${totalDuration > 0 ? (3.0 / totalDuration) * 100 : 0}%`,
+            width: `${totalDuration > 0 ? ((totalDuration - 3.0) / totalDuration) * 100 : 0}%`,
+            height: '100%',
+            background: currentTime >= 3.0 ? '#00ff00' : '#444'
+          }} />
+
+          {/* 当前进度指示器 */}
+          <div style={{
+            position: 'absolute',
+            left: `${progress}%`,
+            width: '2px',
+            height: '100%',
+            background: '#fff',
+            boxShadow: '0 0 4px #fff'
           }} />
         </div>
+
+        <div style={{ fontSize: '10px', marginTop: '5px', display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ color: currentTime < 2.0 ? '#ff6600' : '#666' }}>
+            Phase 0: Wait (2s)
+          </span>
+          <span style={{ color: (currentTime >= 2.0 && currentTime < 3.0) ? '#ffff00' : '#666' }}>
+            Phase 1: Transition (1s)
+          </span>
+          <span style={{ color: currentTime >= 3.0 ? '#00ff00' : '#666' }}>
+            Phase 2: Animation
+          </span>
+        </div>
+
         <div style={{ fontSize: '10px', marginTop: '2px' }}>
           Progress: {progress.toFixed(1)}%
         </div>
@@ -177,12 +225,15 @@ function AnimationControls({
       <div style={{
         marginTop: '15px',
         padding: '8px',
-        background: isPlaying ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 165, 0, 0.1)',
-        border: `1px solid ${isPlaying ? '#00ff00' : '#ffa500'}`,
+        background: isPlaying ? 'rgba(0, 255, 0, 0.1)' :
+                   (progress >= 99.9 ? 'rgba(0, 255, 255, 0.1)' : 'rgba(255, 165, 0, 0.1)'),
+        border: `1px solid ${isPlaying ? '#00ff00' :
+                             (progress >= 99.9 ? '#00ffff' : '#ffa500')}`,
         borderRadius: '4px',
         fontSize: '10px'
       }}>
-        Status: {isPlaying ? '▶️ Playing' : '⏸️ Stopped'}
+        Status: {isPlaying ? '▶️ Playing' :
+                (progress >= 99.9 ? '✅ Completed' : '⏸️ Stopped')}
       </div>
     </div>
   )
