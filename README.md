@@ -1,4 +1,4 @@
-# Fellou Try V6 - 3D动画粒子系统
+# Fello Hero Try V7 - 3D动画粒子系统
 
 这是一个基于Three.js和React Three Fiber的3D动画粒子系统项目，专注于从GLB模型文件中提取动画数据并创建动态粒子效果。
 
@@ -21,15 +21,16 @@
 ## 项目结构
 
 ```
-fellou_try_v6/
+fello_hero_try_v7/
 ├── src/                    # React组件源码
 │   ├── App.jsx            # 主应用组件
-│   ├── AnimationAnalyzer.jsx  # 动画分析器
-│   ├── AnimationControls.jsx  # 动画控制器
+│   ├── components/        # 组件目录
+│   │   ├── AnimatedCamera.jsx  # 动画相机组件
+│   │   ├── AnimationControls.jsx  # 动画控制器
+│   │   └── CompleteAnimationScene.jsx  # 完整动画场景
+│   ├── systems/           # 系统目录
+│   │   └── MultiSourceAnimationExtractor.js  # 多源动画提取器
 │   └── main.jsx           # 应用入口
-├── visual-effects.js       # 视觉效果系统
-├── particle-system.js      # 粒子系统核心
-└── animation-mapping-system.js  # 动画映射系统
 ```
 
 ## 模型文件
@@ -46,7 +47,7 @@ fellou_try_v6/
 
 请将模型文件放置在以下目录中：
 ```
-fellou_try_v6/
+fello_hero_try_v7/
 ├── original_model/         # 原始GLB模型文件
 │   ├── LOST_cut2_v6.glb
 │   ├── Scenes_B_00100.glb

@@ -1,7 +1,7 @@
 {
-  "name": "particle-animation-system",
+  "name": "fello-hero-try-v7",
   "version": "1.0.0",
-  "description": "Scenes B to v6 rings particle animation mapping system",
+  "description": "Fello Hero Try V7 - Advanced 3D Animation Particle System",
   "type": "module",
   "scripts": {
     "dev": "vite",
